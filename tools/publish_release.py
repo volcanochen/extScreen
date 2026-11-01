@@ -1,14 +1,30 @@
 # -*- coding: utf-8 -*-
-"""创建 GitHub Release 并上传资产（通过 REST API，不依赖 gh CLI）。"""
+"""创建 GitHub Release 并上传资产（通过 REST API，不依赖 gh CLI）。
+
+用法：
+    python tools/publish_release.py                       # 用下面的默认值
+    python tools/publish_release.py --repo owner/name --tag v1.2.0
+    python tools/publish_release.py --assets-dir D:/out  --notes notes.md
+    python tools/publish_release.py --asset "名称=路径" --asset "名称=路径"
+
+要点：
+  * 资产名必须纯 ASCII —— GitHub 会把中文名转义成点号（`副屏` -> `.`），
+    下载链接会失效。中文说明写进 label。
+  * DELETE 资产返回 204 空体，解析要容错。
+  * 同一个 tag 重复执行时会更新已有 release，不会重复创建。
+"""
+import argparse
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 
-REPO = 'volcanochen/extScreen'
-TAG = 'v1.0.0'
-ASSETS_DIR = r'C:\VOLCANO\myws\extScreen\release_assets'
+DEFAULT_REPO = 'volcanochen/extScreen'
+DEFAULT_TAG = 'v1.0.0'
+DEFAULT_ASSETS_DIR = r'C:\VOLCANO\myws\extScreen\release_assets'
 
 RELEASE_NAME = 'ExtScreen 副屏助手 v1.0.0'
 
@@ -77,7 +93,6 @@ Windows 真实显示器  +  VDD 虚拟屏 (1080x2220 @60Hz)
 
 
 def get_token():
-    import subprocess
     out = subprocess.run(['git', 'credential', 'fill'],
                          input='url=https://github.com\n',
                          capture_output=True, text=True, timeout=60).stdout
@@ -103,45 +118,98 @@ def api(url, token, method='GET', data=None, raw=None, content_type=None):
         return r.status, r.read()
 
 
+def parse_args():
+    p = argparse.ArgumentParser(
+        description='创建 GitHub Release 并上传资产（REST API，不依赖 gh CLI）')
+    p.add_argument('--repo', default=DEFAULT_REPO,
+                   help='owner/name，默认 %(default)s')
+    p.add_argument('--tag', default=DEFAULT_TAG,
+                   help='发布 tag，默认 %(default)s')
+    p.add_argument('--assets-dir', default=DEFAULT_ASSETS_DIR,
+                   help='资产目录，目录内的文件全部上传，默认 %(default)s')
+    p.add_argument('--asset', action='append', metavar='名称=路径',
+                   help='单个资产，name=path，可重复；给了它就忽略 --assets-dir')
+    p.add_argument('--notes', help='release 正文文件（Markdown），默认用内置说明')
+    p.add_argument('--name', help='release 标题，默认用内置标题')
+    p.add_argument('--target', default='main',
+                   help='目标分支，默认 %(default)s')
+    p.add_argument('--prerelease', action='store_true', help='标记为预发布')
+    p.add_argument('--dry-run', action='store_true', help='只打印计划，不实际上传')
+    return p.parse_args()
+
+
+def collect_assets(args):
+    """返回 [(上传名, 本地路径, label), ...]"""
+    out = []
+    if args.asset:
+        for spec in args.asset:
+            if '=' not in spec:
+                raise SystemExit('--asset 格式应为 名称=路径，收到: %r' % spec)
+            name, path = spec.split('=', 1)
+            out.append((name.strip(), path.strip(), ''))
+        return out
+    if not os.path.isdir(args.assets_dir):
+        return out
+    for fn in sorted(os.listdir(args.assets_dir)):
+        p = os.path.join(args.assets_dir, fn)
+        if os.path.isfile(p):
+            out.append((fn, p, ''))
+    return out
+
+
 def main():
+    args = parse_args()
     token = get_token()
-    base = 'https://api.github.com/repos/' + REPO
+    base = 'https://api.github.com/repos/' + args.repo
+
+    body_text = BODY
+    if args.notes:
+        with open(args.notes, encoding='utf-8') as f:
+            body_text = f.read()
+    release_name = args.name or RELEASE_NAME
 
     # 1. 看看 release 是否已存在
     try:
-        st, body = api(base + '/releases/tags/' + TAG, token)
-        print('release 已存在，改为更新')
+        st, body = api(base + '/releases/tags/' + args.tag, token)
         release = json.loads(body)
         release_id = release['id']
+        print('release 已存在(id=%s)，将复用并更新正文' % release_id)
+        st, body = api(base + '/releases/%d' % release_id, token, method='PATCH',
+                       data={'name': release_name, 'body': body_text,
+                             'prerelease': args.prerelease})
+        print('release 正文已更新')
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
-        payload = {'tag_name': TAG, 'name': RELEASE_NAME, 'body': BODY,
-                   'draft': False, 'prerelease': False,
-                   'target_commitish': 'main'}
+        payload = {'tag_name': args.tag, 'name': release_name, 'body': body_text,
+                   'draft': False, 'prerelease': args.prerelease,
+                   'target_commitish': args.target}
         st, body = api(base + '/releases', token, method='POST', data=payload)
         release = json.loads(body)
         release_id = release['id']
         print('release 创建成功 id=%s url=%s' % (release_id, release['html_url']))
 
     # 2. 上传资产
-    assets = [
-        ('ExtScreen-副屏助手-v1.0.0.exe', '托盘主程序，需要管理员权限运行'),
-        ('MttVDD-25.7.23-signed-drivers-x86.zip', '虚拟显示器驱动（官方签名版）'),
-        ('sunshine-installer.msi', 'Sunshine 串流主机端安装包'),
-    ]
-    upload_url = 'https://uploads.github.com/repos/%s/releases/%d/assets' % (REPO, release_id)
-    for name, label in assets:
-        path = os.path.join(ASSETS_DIR, name)
+    assets = collect_assets(args)
+    if not assets:
+        print('没有找到资产可上传（目录：%s）' % args.assets_dir)
+    upload_url = 'https://uploads.github.com/repos/%s/releases/%d/assets' % (
+        args.repo, release_id)
+    for name, path, label in assets:
         if not os.path.exists(path):
-            print('跳过（不存在）:', name)
+            print('跳过（不存在）:', path)
+            continue
+        if args.dry_run:
+            print('DRY-RUN  %-46s %8.2f MB  <- %s' % (
+                name, os.path.getsize(path) / 1048576, path))
             continue
         size = os.path.getsize(path)
         print('上传 %-46s %8.2f MB ...' % (name, size / 1048576), end='', flush=True)
         with open(path, 'rb') as f:
             raw = f.read()
-        params = '?name=%s&label=%s' % (
-            urllib.parse.quote(name), urllib.parse.quote(label))
+        params = '?name=%s' % urllib.parse.quote(name)
+        if label:
+            params += '&label=' + urllib.parse.quote(label)
         try:
             st, body = api(upload_url + params, token, method='POST',
                            raw=raw, content_type='application/octet-stream')
@@ -151,7 +219,7 @@ def main():
             print(' 失败 http=%s %s' % (e.code, e.read().decode('utf-8', 'ignore')[:300]))
 
     # 3. 汇总
-    st, body = api(base + '/releases/tags/' + TAG, token)
+    st, body = api(base + '/releases/tags/' + args.tag, token)
     d = json.loads(body)
     print('\n=== Release 汇总 ===')
     print('name    :', d.get('name'))
@@ -165,5 +233,5 @@ def main():
 
 
 if __name__ == '__main__':
-    import urllib.parse
     main()
+
