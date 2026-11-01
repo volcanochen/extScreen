@@ -63,6 +63,16 @@ VDD_SETTINGS = r'C:\VirtualDisplayDriver\vdd_settings.xml'
 
 ## 快速开始
 
+### 0. 下载
+
+从 [Releases](https://github.com/volcanochen/extScreen/releases) 下载：
+
+| 文件 | 说明 |
+|---|---|
+| `ExtScreen-Dock-v1.0.0.exe` | 托盘主程序（**双击运行，需要管理员权限**） |
+| `MttVDD-25.7.23-signed-drivers-x86.zip` | 虚拟显示器驱动（官方签名版） |
+| `sunshine-installer.msi` | Sunshine 串流主机端安装包 |
+
 ### 1. 装依赖
 
 托盘菜单「环境与依赖」里有一键安装入口，也可以手动：
@@ -105,6 +115,24 @@ python tools/deploy.py
 
 产物：`dist/ExtScreenDock.exe` → `release/ExtScreen 副屏助手.exe`
 
+### 发一个 Release
+
+```bash
+# 1. 把待发布资产放进 release_assets/
+#    ExtScreen-Dock-v1.0.0.exe
+#    MttVDD-25.7.23-signed-drivers-x86.zip
+#    sunshine-installer.msi
+# 2. 打 tag
+git tag -a v1.0.0 -m "release notes"
+git push origin main --tags
+# 3. 创建 release 并上传资产
+python tools/publish_release.py
+```
+
+`tools/publish_release.py` 走 GitHub REST API，不需要装 `gh` CLI。
+**资产名务必用纯 ASCII** —— GitHub 会把中文名转义成点号（`副屏` → `.`），
+下载链接会变得不可用。
+
 ---
 
 ## 目录结构
@@ -121,6 +149,7 @@ tools/
   svc_ctl.py / vdd_ctl.py     短命提权脚本（起停服务 / 操作虚拟屏）
   patch_moonlight.py          Moonlight 竖屏补丁
   e2e_cycle.py                开→串流→关 端到端循环测试
+  publish_release.py          GitHub Release 发布脚本（REST API，无需 gh CLI）
 vendor/moonlight-desktop-extender/   运行时依赖的虚拟屏控制脚本（已含本项目补丁）
 docs/                            补丁说明、构建脚本、验证截图
 ```
