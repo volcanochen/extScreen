@@ -1,0 +1,49 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 构建产物 ----
+build/
+dist/
+# 注意：打包配置 ExtScreenDock.spec 需要入库，*.spec 的忽略规则已移除
+
+# ---- 发布目录（exe 走 GitHub Releases，不进仓库）----
+release/
+
+# ---- 运行时日志 ----
+*.log
+extscreen.log
+
+# ---- 第三方二进制与大文件（体积过大 / 可重新获取）----
+tools/*.apk
+tools/*.apk.idsig
+tools/*.zip
+tools/*.msi
+tools/*.jar
+tools/vdd-new/
+tools/ml_src/
+tools/ml_patch/
+
+# 上游仓库副本（MIT）；本项目修改后的版本在 vendor/moonlight-desktop-extender/
+tools/moonlight-desktop-extender-main/
+
+# ---- 临时输出 ----
+tools/*_out.txt
+tools/e2e_trace.jsonl
+tools/e2e_out.json
+nul
+*.tmp
+*.bak
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- WorkBuddy 工作目录（工具私有数据，不入库）----
+.workbuddy/
