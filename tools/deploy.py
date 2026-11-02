@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import time
 
-SRC = r'C:\VOLCANO\myws\extScreen\build\dist\ExtScreenDock.exe'
+SRC = r'C:\VOLCANO\myws\extScreen\dist\ExtScreenDock.exe'
 DST = r'C:\VOLCANO\myws\extScreen\release\ExtScreen 副屏助手.exe'
 LOG = r'C:\VOLCANO\myws\extScreen\tools\deploy_out.txt'
 
