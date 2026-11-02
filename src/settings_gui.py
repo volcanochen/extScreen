@@ -31,14 +31,20 @@ $curPos   = [string](Cfg 'position' 'right')
 $curAlign = [string](Cfg 'align' 'start')
 $curAudio = [bool](Cfg 'streamAudio' $false)
 
-# W=0,H=0 表示「跟随手机屏幕」
+# W=0,H=0 表示「跟随手机屏幕」。其余为手动档位，必须与 extscreen_core.py 的
+# RESOLUTION_PRESETS 保持一致，且都已在 extscreen_dock.py 的 VDD_XML 模板中声明。
 $presets = @(
-    [pscustomobject]@{ T = '自动：跟随手机屏幕铺满（推荐）'; W = 0;    H = 0    },
-    [pscustomobject]@{ T = '2220 x 1080   横屏';             W = 2220; H = 1080 },
-    [pscustomobject]@{ T = '1080 x 2220   竖屏';             W = 1080; H = 2220 },
-    [pscustomobject]@{ T = '1920 x 1080   横屏（标准）';     W = 1920; H = 1080 },
-    [pscustomobject]@{ T = '1440 x 2960   竖屏（物理）';     W = 1440; H = 2960 },
-    [pscustomobject]@{ T = '1280 x 720    轻量';             W = 1280; H = 720  }
+    [pscustomobject]@{ T = '自动：跟随手机屏幕铺满（推荐）'; W = 0;     H = 0     },
+    [pscustomobject]@{ T = '1440 x 2960   竖屏 · 最细腻（字最小）'; W = 1440; H = 2960 },
+    [pscustomobject]@{ T = '1080 x 2220   竖屏 · 默认';             W = 1080; H = 2220 },
+    [pscustomobject]@{ T = '900 x 1850    竖屏 · 字稍大';           W = 900;  H = 1850 },
+    [pscustomobject]@{ T = '800 x 1646    竖屏 · 字更大';           W = 800;  H = 1646 },
+    [pscustomobject]@{ T = '720 x 1480    竖屏 · 字明显更大';        W = 720;  H = 1480 },
+    [pscustomobject]@{ T = '640 x 1320    竖屏 · 字很大';           W = 640;  H = 1320 },
+    [pscustomobject]@{ T = '540 x 1110    竖屏 · 字最大最清楚';      W = 540;  H = 1110 },
+    [pscustomobject]@{ T = '1920 x 1080   横屏 · 标准';             W = 1920; H = 1080 },
+    [pscustomobject]@{ T = '2220 x 1080   横屏 · 宽屏';             W = 2220; H = 1080 },
+    [pscustomobject]@{ T = '1280 x 720    横屏 · 轻量';             W = 1280; H = 720  }
 )
 $orientMap = @('landscape', 'portrait')
 $orientTxt = @('横屏', '竖屏')
@@ -138,25 +144,27 @@ $chkStart.AutoSize = $true
 $form.Controls.Add($chkStart)
 
 $hint = New-Object System.Windows.Forms.Label
-$hint.Text = "扩展屏是一块独立的虚拟显示器：鼠标从主屏边缘滑过去即可操作，" + `
+$hint.Text = "手机 PPI 比电脑高，虚拟屏渲染像素越密，手机上越小越糊。" + `
              [Environment]::NewLine + `
-             "把窗口直接拖过去就在手机上显示。Moonlight 串流时手机是横屏，" + `
+             "把分辨率调低（如 720x1480），Windows 在更少像素上画同样桌面，" + `
              [Environment]::NewLine + `
-             "选「自动」才能铺满整块屏幕而不出现黑边。"
-$hint.Location = New-Object System.Drawing.Point(20, 204)
-$hint.Size = New-Object System.Drawing.Size(390, 62)
+             "手机端拉伸后文字更大更清楚——多试几个档位挑最舒服的。" + `
+             [Environment]::NewLine + `
+             "扩展屏是块独立虚拟显示器：鼠标从主屏边缘滑过去即可操作。"
+$hint.Location = New-Object System.Drawing.Point(20, 200)
+$hint.Size = New-Object System.Drawing.Size(390, 78)
 $hint.ForeColor = [System.Drawing.Color]::FromArgb(120, 120, 120)
 $form.Controls.Add($hint)
 
 $sep = New-Object System.Windows.Forms.Label
 $sep.BorderStyle = 'Fixed3D'
-$sep.Location = New-Object System.Drawing.Point(20, 272)
+$sep.Location = New-Object System.Drawing.Point(20, 286)
 $sep.Size = New-Object System.Drawing.Size(390, 2)
 $form.Controls.Add($sep)
 
 $btnOK = New-Object System.Windows.Forms.Button
 $btnOK.Text = '保存'
-$btnOK.Location = New-Object System.Drawing.Point(230, 290)
+$btnOK.Location = New-Object System.Drawing.Point(230, 304)
 $btnOK.Size = New-Object System.Drawing.Size(88, 32)
 $btnOK.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
 $btnOK.ForeColor = [System.Drawing.Color]::White
@@ -165,7 +173,7 @@ $form.Controls.Add($btnOK)
 
 $btnCancel = New-Object System.Windows.Forms.Button
 $btnCancel.Text = '取消'
-$btnCancel.Location = New-Object System.Drawing.Point(326, 290)
+$btnCancel.Location = New-Object System.Drawing.Point(326, 304)
 $btnCancel.Size = New-Object System.Drawing.Size(88, 32)
 $btnCancel.FlatStyle = 'Flat'
 $form.Controls.Add($btnCancel)

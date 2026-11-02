@@ -552,6 +552,64 @@ def bind_sunshine_output(verbose=True):
     return ok, msg, changed
 
 
+def set_resolution(res_str):
+    """切换虚拟屏分辨率，并写进配置。返回 (ok, msg)。
+
+    为什么降低分辨率能让手机看清楚：手机 PPI 远高于电脑显示器，虚拟屏渲染的
+    像素越密，串流到手机被拉伸后内容就越小越糊。把渲染分辨率调低，Windows 在
+    更少的像素上画同样的桌面，手机端拉伸后文字/图标变大，反而看得清。
+
+    切换逻辑：
+      1. 写配置（resolution / fallbackWidth / fallbackHeight）；
+      2. 若当前没开屏，直接返回「下次开启生效」；
+      3. 若已开屏，确保 vdd_settings.xml 含该模式（模板已含全部档位），再用
+         ChangeDisplaySettingsExW 实时切换——device_id 由 EDID 推导、跨重启不变，
+         所以 Sunshine 的串流目标不用改、也不用重启 Sunshine；
+      4. 万一驱动没声明该模式（例如旧配置未重建节点），重建设备节点强制驱动
+         重读 vdd_settings.xml，再切一次。
+    """
+    cfg = load_ext_config()
+    res = str(res_str).lower().strip()
+    if res != 'auto':
+        try:
+            w, h = [int(v) for v in res.split('x', 1)]
+        except Exception:
+            return False, '分辨率格式应为 宽x高，例如 720x1480'
+        if w <= 0 or h <= 0:
+            return False, '分辨率数值无效'
+        cfg['fallbackWidth'] = w
+        cfg['fallbackHeight'] = h
+    cfg['resolution'] = res
+    ok_s, m_s = save_ext_config(cfg)
+    if not ok_s:
+        return False, '保存配置失败：%s' % m_s
+
+    if not vdd_attached():
+        return True, '已保存为「%s」，下次开启扩展屏时生效' % res
+
+    # 已开启：确保驱动支持该模式（模板已含全部新档位），再实时切换
+    ensure_vdd_config()
+    dev, _ = disp.find_vdd()
+    if not dev:
+        return False, '虚拟屏已挂出但找不到设备节点'
+    w, h, src = target_resolution(cfg)
+    ok, m = disp.place(dev, w, h, 60,
+                       position=cfg.get('position', 'right'),
+                       align=cfg.get('align', 'start'))
+    if not ok and ('驱动不支持' in m or 'BADMODE' in m):
+        # 驱动没这个模式：重建设备节点，强制驱动重读 vdd_settings.xml
+        log('set_resolution: 驱动不支持 %dx%d，重建设备节点' % (w, h))
+        recreate_vdd_device()
+        dev, _ = disp.find_vdd()
+        if dev:
+            ok, m = disp.place(dev, w, h, 60,
+                              position=cfg.get('position', 'right'),
+                              align=cfg.get('align', 'start'))
+    if ok:
+        return True, '已切换到 %dx%d（%s）。若手机画面异常，重连一次即可' % (w, h, src)
+    return False, '切换失败：%s' % m
+
+
 def ensure_layout():
     """把虚拟屏调成目标分辨率并摆到主屏右侧。返回 (ok, 消息列表)。"""
     msgs = []
@@ -702,12 +760,22 @@ VDD_XML = """<?xml version="1.0" encoding="utf-8"?>
     <g_refresh_rate>120</g_refresh_rate>
   </global>
   <resolutions>
+    <!-- 横屏标准 -->
     <resolution><width>1920</width><height>1080</height><refresh_rate>60</refresh_rate></resolution>
     <resolution><width>2560</width><height>1440</height><refresh_rate>60</refresh_rate></resolution>
-    <resolution><width>1080</width><height>2220</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>1280</width><height>720</height><refresh_rate>60</refresh_rate></resolution>
+    <!-- 横屏宽 -->
     <resolution><width>2220</width><height>1080</height><refresh_rate>60</refresh_rate></resolution>
-    <resolution><width>1440</width><height>2960</height><refresh_rate>60</refresh_rate></resolution>
     <resolution><width>2960</width><height>1440</height><refresh_rate>60</refresh_rate></resolution>
+    <!-- 竖屏：默认 / 物理 -->
+    <resolution><width>1080</width><height>2220</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>1440</width><height>2960</height><refresh_rate>60</refresh_rate></resolution>
+    <!-- 竖屏：逐档降低渲染分辨率，让手机上字更大更清楚（≈19.5:9，不变形） -->
+    <resolution><width>900</width><height>1850</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>800</width><height>1646</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>720</width><height>1480</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>640</width><height>1320</height><refresh_rate>60</refresh_rate></resolution>
+    <resolution><width>540</width><height>1110</height><refresh_rate>60</refresh_rate></resolution>
   </resolutions>
   <options>
     <CustomEdid>false</CustomEdid>
@@ -1105,12 +1173,50 @@ def _noop(icon=None, item=None):
     return None
 
 
+# --------------------------------------------------------------------------
+# 分辨率子菜单：随时切换虚拟屏渲染分辨率
+# --------------------------------------------------------------------------
+def _res_val(w, h):
+    return 'auto' if (w == 0 and h == 0) else '%dx%d' % (w, h)
+
+
+def _res_checked(val):
+    """菜单勾选状态：读当前配置，命中即打勾（每次打开菜单都会重算）。"""
+    def _f(item):
+        try:
+            cfg = load_ext_config()
+        except Exception:
+            return False
+        return str(cfg.get('resolution') or 'auto').lower() == val
+    return _f
+
+
+def _res_action(val):
+    """点击：异步切换分辨率。"""
+    def _f(icon=None, item=None):
+        do_async(set_resolution, val)
+    return _f
+
+
+def _build_resolution_menu():
+    items = []
+    for label, w, h in RESOLUTION_PRESETS:
+        val = _res_val(w, h)
+        items.append(pystray.MenuItem(
+            label, _res_action(val), checked=_res_checked(val)))
+    return pystray.Menu(*items)
+
+
+RES_SUBMENU = _build_resolution_menu()
+
+
 MENU = pystray.Menu(
     pystray.MenuItem(menu_title, _noop, enabled=False),
     pystray.Menu.SEPARATOR,
     pystray.MenuItem(menu_sunshine,
                      lambda icon=None, item=None: do_async(start_or_install_sunshine)),
     pystray.MenuItem(menu_toggle, toggle_extscreen, default=True),
+    pystray.MenuItem('虚拟屏分辨率', RES_SUBMENU),
     pystray.MenuItem('打开手机控制窗口 (scrcpy)',
                      lambda icon=None, item=None: do_async(launch_scrcpy)),
     pystray.Menu.SEPARATOR,
