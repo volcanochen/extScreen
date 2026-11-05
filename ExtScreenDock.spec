@@ -18,7 +18,8 @@ a = Analysis(
     [os.path.join('src', 'extscreen_dock.py')],
     pathex=[os.path.join(ROOT, 'src')],
     binaries=[],
-    datas=[],
+    # 手机型号→商品名对照表（Google Play 设备注册表生成，1.1 万+ 条）
+    datas=[(os.path.join(ROOT, 'src', 'phone_names.json'), '.')],
     hiddenimports=['pystray._win32'],
     hookspath=[],
     hooksconfig={},

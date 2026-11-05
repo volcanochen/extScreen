@@ -89,6 +89,18 @@ function Add-Combo($x, $y, $w, $items, $sel) {
 
 # ---------------- 分辨率 ----------------
 Add-Label '扩展屏分辨率' 20 14
+$btnCast = New-Object System.Windows.Forms.Button
+$btnCast.Text = '快速投屏 ▶'
+$btnCast.Location = New-Object System.Drawing.Point(306, 8)
+$btnCast.Size = New-Object System.Drawing.Size(114, 26)
+$btnCast.FlatStyle = 'Flat'
+$btnCast.BackColor = [System.Drawing.Color]::FromArgb(0, 153, 90)
+$btnCast.ForeColor = [System.Drawing.Color]::White
+$form.Controls.Add($btnCast)
+$btnCast.Add_Click({
+    $global:EXT_RESULT = '{"action":"cast"}'
+    $form.Close()
+})
 $resSel = 0
 if ($curRes -eq 'auto') {
     $resSel = 0
@@ -229,7 +241,12 @@ def show_settings():
                 log(f'settings parse error: {e}')
             break
 
-    if not payload or payload.get('action') != 'save':
+    if not payload:
+        return False, '已取消'
+    if payload.get('action') == 'cast':
+        # 设置窗口右上角「快速投屏」：让 Dock 去走选窗口→开始投屏流程
+        return False, '__cast__'
+    if payload.get('action') != 'save':
         return False, '已取消'
 
     cfg = load_ext_config()

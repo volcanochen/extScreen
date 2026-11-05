@@ -168,6 +168,29 @@ def main():
             body_text = f.read()
     release_name = args.name or RELEASE_NAME
 
+    # dry-run 必须完全只读：早期版本只在上传资产时判断 dry-run，
+    # 结果「预演」把 release 真建出来了（2026-11-05 踩过）。这里提前返回，
+    # 除了一次 GET 探查远端状态外不做任何写操作。
+    if args.dry_run:
+        print('=== DRY-RUN：不创建/修改 release，仅打印计划 ===')
+        print('repo=%s  tag=%s  name=%s' % (args.repo, args.tag, release_name))
+        print('notes=%s (%d chars)' % (args.notes or '内置说明',
+                                      len(body_text)))
+        try:
+            api(base + '/releases/tags/' + args.tag, token)
+            print('远端：release 已存在 → 正式执行时复用并更新正文')
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                print('远端：release 不存在 → 正式执行时新建')
+            else:
+                raise
+        for name, path, label in collect_assets(args):
+            exists = os.path.exists(path)
+            mb = os.path.getsize(path) / 1048576 if exists else 0
+            print('DRY-RUN  %-46s %8.2f MB  <- %s%s' % (
+                name, mb, path, '' if exists else '（不存在，将跳过）'))
+        return
+
     # 1. 看看 release 是否已存在
     try:
         st, body = api(base + '/releases/tags/' + args.tag, token)

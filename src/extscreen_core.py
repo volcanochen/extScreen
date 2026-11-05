@@ -499,6 +499,22 @@ DEFAULT_EXT_CONFIG = {
     'moonlightUuid': '',
     'moonlightAppId': '881448767',
     'moonlightAppName': 'Desktop',
+    # 窗口投屏（Deskreen CE 后端）
+    'deskreenPath': '',          # 自动探测；装在非常规位置时手动指定 exe
+    'deskreenAutoStart': False,  # Dock 启动时自动拉起 Deskreen 并广播
+    'deskreenInspectPort': 9229, # Node inspector 端口（兜底通道）
+    'deskreenDebugPort': 9222,   # CDP 调试端口（主通道，读房间号用）
+    # 窗口投屏（自研 cast 后端）
+    'castPort': 8123,            # HTTP 服务端口（占用时自动换）
+    'castWidth': 1080,           # 推流宽度（手机端显示宽度；720 在 1080p 手机上发虚）
+    'castFps': 20,               # 帧率上限
+    'castQuality': 80,           # JPEG 质量
+    'castAdbLaunch': True,       # 投屏开始时用 adb 自动拉起 USB 连接的手机接收器
+    'castFitWindow': True,       # 按手机屏幕比例自动调整被投窗口大小（画面铺满无黑边）
+    'castFitWidth': 700,         # 适配后的窗口可见宽度（像素，0=保持原窗口大小只记比例）
+    'castFitFollowRotate': True, # 手机横竖屏切换时跟随调整窗口比例
+    'castTouchControl': True,    # 手机触摸回传为鼠标消息（只投给被投窗口）
+    'castNoActivate': True,      # 无感操作：投屏期间点击不把窗口顶到前台
 }
 
 # 第一个是「跟随手机屏幕」，其余是手动指定。

@@ -34,6 +34,7 @@ DM_DISPLAYFREQUENCY = 0x00400000
 
 ENUM_CURRENT_SETTINGS = 0xFFFFFFFF
 CDS_UPDATEREGISTRY = 0x00000001
+CDS_NORESET = 0x10000000
 CDS_RESET = 0x40000000
 
 DISP_CHANGE_SUCCESS = 0
@@ -160,6 +161,52 @@ def find_vdd():
         if any(h in low for h in VDD_HINTS):
             return d['name'], d['desc']
     return None, None
+
+
+def find_vdd_any():
+    """找到虚拟显示器的 GDI 适配器名（含未挂出的）。
+
+    每次驱动 reload 后 GDI 名都会变（DISPLAY467→505…），必须现查现用。
+    """
+    for d in enum_devices():
+        low = (d['desc'] or '').lower()
+        if any(h in low for h in VDD_HINTS):
+            return d['name'], d['desc']
+    return None, None
+
+
+def attach_monitor(dev, w, h, fps=60, x=None, y=None):
+    """把「设备在但显示器没挂到桌面上」的虚拟屏显式挂出。
+
+    驱动 reload（pnputil enable / 设备节点重建）后 Windows 只是创建
+    monitor 对象，不一定把它放进桌面拓扑——表现为 EnumDisplayDevices
+    一直 ATTACHED_TO_DESKTOP=0，重多少遍都没用。经典两步法（先对
+    该适配器写 DM_POSITION+分辨率（CDS_NORESET|CDS_UPDATEREGISTRY），
+    再空调用一次提交拓扑）可以强制挂出。
+
+    注意：detached 显示器 EnumDisplaySettings 拿不到当前模式，
+    所以这里从零构造 DEVMODE，不走 current_mode()。
+    """
+    dm = DEVMODEW()
+    dm.dmSize = ctypes.sizeof(DEVMODEW)
+    dm.dmFields = (DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY
+                   | DM_POSITION)
+    dm.dmPelsWidth = w
+    dm.dmPelsHeight = h
+    dm.dmDisplayFrequency = fps
+    if x is not None:
+        dm.dmPositionX = x
+    if y is not None:
+        dm.dmPositionY = y
+    rc = _user32.ChangeDisplaySettingsExW(
+        ctypes.c_wchar_p(dev), ctypes.byref(dm), None,
+        CDS_UPDATEREGISTRY | CDS_NORESET, None)
+    if rc != DISP_CHANGE_SUCCESS:
+        return False, f'挂出第一步失败 rc={rc}'
+    rc2 = _user32.ChangeDisplaySettingsExW(None, None, None, 0, None)
+    if rc2 != DISP_CHANGE_SUCCESS:
+        return False, f'拓扑提交失败 rc={rc2}'
+    return True, '已挂出'
 
 
 def vdd_rect():

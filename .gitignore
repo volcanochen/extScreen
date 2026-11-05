@@ -48,3 +48,12 @@ desktop.ini
 
 # ---- WorkBuddy 工作目录（工具私有数据，不入库）----
 .workbuddy/
+
+# ---- Deskreen 调研副本（上游源码快照，不入库）----
+deskreen-upstream/
+
+# ---- 接收器签名密钥（本机生成，丢了可重建）----
+tools/extscreen_viewer.keystore
+
+# ---- 临时调试脚手架 / 探针输出（不入库）----
+tools/_*

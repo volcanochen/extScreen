@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 780" width="1400" height="780" font-family="Microsoft YaHei, PingFang SC, Segoe UI, sans-serif">
+  <rect x="0" y="0" width="1400" height="780" fill="#f8fafc"/>
+  <text x="36" y="44" font-size="26" font-weight="700" fill="#0f172a">ExtScreen 双链路架构总览</text>
+  <text x="36" y="70" font-size="14" fill="#64748b">同一个托盘程序（Dock）：扩展屏 = 整块虚拟桌面；窗口投屏 = 单个窗口</text>
+
+  <!-- ============ PC 区 ============ -->
+  <rect x="30" y="92" width="660" height="620" rx="16" fill="#eef2ff" stroke="#a5b4fc" stroke-width="2"/>
+  <text x="52" y="122" font-size="18" font-weight="700" fill="#3730a3">Windows PC</text>
+  <text x="52" y="144" font-size="13" fill="#6366f1">管理员权限托盘 · PyInstaller 单文件</text>
+
+  <rect x="52" y="160" width="616" height="126" rx="12" fill="#ffffff" stroke="#6366f1" stroke-width="2"/>
+  <text x="70" y="186" font-size="15" font-weight="700" fill="#1e1b4b">ExtScreen Dock（托盘主控）</text>
+  <g font-size="12" fill="#312e81">
+    <rect x="70" y="198" width="140" height="32" rx="6" fill="#e0e7ff"/><text x="80" y="219">core：SCM / 日志探针</text>
+    <rect x="218" y="198" width="140" height="32" rx="6" fill="#e0e7ff"/><text x="228" y="219">display：EDID / 布局</text>
+    <rect x="366" y="198" width="140" height="32" rx="6" fill="#e0e7ff"/><text x="376" y="219">dock：菜单 / 状态轮询</text>
+    <rect x="514" y="198" width="136" height="32" rx="6" fill="#e0e7ff"/><text x="524" y="219">标题栏按钮 / 钩子</text>
+    <rect x="70" y="238" width="140" height="30" rx="6" fill="#f1f5f9"/><text x="80" y="258">选择器 WinForms</text>
+    <rect x="218" y="238" width="140" height="30" rx="6" fill="#f1f5f9"/><text x="228" y="258">phone_names 表</text>
+    <rect x="366" y="238" width="140" height="30" rx="6" fill="#f1f5f9"/><text x="376" y="258">config.json</text>
+    <rect x="514" y="238" width="136" height="30" rx="6" fill="#f1f5f9"/><text x="524" y="258">cmd.txt 调试通道</text>
+  </g>
+
+  <!-- 链路 1 -->
+  <rect x="52" y="304" width="292" height="176" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+  <text x="68" y="330" font-size="15" font-weight="700" fill="#1d4ed8">① 扩展屏链路（v1.0）</text>
+  <rect x="68" y="344" width="260" height="36" rx="6" fill="#dbeafe"/>
+  <text x="80" y="367" font-size="12" fill="#1e3a8a">MttVDD 虚拟屏 1080×2220 @60</text>
+  <rect x="68" y="390" width="260" height="36" rx="6" fill="#dbeafe"/>
+  <text x="80" y="413" font-size="12" fill="#1e3a8a">Sunshine：DXGI 捕获 → NVENC</text>
+  <text x="68" y="452" font-size="11" fill="#64748b">就绪判据：日志 mDNS service 标志</text>
+
+  <!-- 链路 2 -->
+  <rect x="360" y="304" width="308" height="278" rx="12" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+  <text x="376" y="330" font-size="15" font-weight="700" fill="#047857">② 窗口投屏（v1.2+ 自研 cast）</text>
+  <rect x="376" y="344" width="276" height="36" rx="6" fill="#d1fae5"/>
+  <text x="388" y="367" font-size="12" fill="#065f46">CastManager：多路会话（MAX 4）</text>
+  <rect x="376" y="390" width="132" height="52" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="386" y="410" font-size="11" fill="#065f46">CastMonitor A</text>
+  <text x="386" y="430" font-size="11" fill="#065f46">:8123 / MJPEG</text>
+  <rect x="520" y="390" width="132" height="52" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="530" y="410" font-size="11" fill="#065f46">CastMonitor B</text>
+  <text x="530" y="430" font-size="11" fill="#065f46">:8124 / MJPEG</text>
+  <text x="376" y="466" font-size="11" fill="#64748b">每路独立：抓帧线程 / 端口 / mDNS 实例</text>
+  <rect x="376" y="478" width="276" height="34" rx="6" fill="#fef3c7" stroke="#fcd34d"/>
+  <text x="388" y="500" font-size="11" fill="#92400e">extscreen_mdns.py：纯标准库 DNS-SD</text>
+  <text x="376" y="538" font-size="11" fill="#64748b">fit_window_to_aspect：按手机比例调窗口</text>
+  <text x="376" y="560" font-size="11" fill="#64748b">handle_touch：PostMessage 鼠标消息</text>
+
+  <text x="52" y="632" font-size="12" fill="#475569">开屏顺序：修配置 → 挂虚拟屏 → 摆布局 → 启服务 → 等真实就绪标志</text>
+  <text x="52" y="656" font-size="12" fill="#475569">关屏顺序：先停 Sunshine → 再关虚拟屏（否则 PnP 禁用会卡 150 秒）</text>
+  <text x="52" y="684" font-size="12" fill="#475569">标题栏投屏按钮：单实例前台跟随，禁跨进程 Owner 绑定</text>
+
+  <!-- ============ 协议通道 ============ -->
+  <rect x="706" y="160" width="188" height="446" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="722" y="186" font-size="14" font-weight="700" fill="#334155">连接通道</text>
+  <text x="722" y="206" font-size="11" fill="#64748b">USB / 同一局域网</text>
+
+  <g font-size="11">
+    <rect x="720" y="222" width="160" height="44" rx="8" fill="#dbeafe" stroke="#60a5fa"/>
+    <text x="732" y="241" font-size="12" font-weight="700" fill="#1d4ed8">→ RTSP 47989</text>
+    <text x="732" y="258" font-size="11" fill="#1e40af">NVENC 硬编，整屏</text>
+    <rect x="720" y="282" width="160" height="44" rx="8" fill="#d1fae5" stroke="#34d399"/>
+    <text x="732" y="301" font-size="12" font-weight="700" fill="#047857">→ MJPEG /stream</text>
+    <text x="732" y="318" font-size="11" fill="#065f46">HTTP :8123 / :8124 …</text>
+    <rect x="720" y="342" width="160" height="44" rx="8" fill="#f1f5f9" stroke="#94a3b8"/>
+    <text x="732" y="361" font-size="12" font-weight="700" fill="#334155">→ mDNS 组播 5353</text>
+    <text x="732" y="378" font-size="11" fill="#475569">PTR / SRV / TXT / A</text>
+    <rect x="720" y="402" width="160" height="44" rx="8" fill="#ecfdf5" stroke="#34d399"/>
+    <text x="732" y="421" font-size="12" font-weight="700" fill="#047857">← adb reverse</text>
+    <text x="732" y="438" font-size="11" fill="#065f46">127.0.0.1 走 USB 回环</text>
+    <rect x="720" y="462" width="160" height="44" rx="8" fill="#fee2e2" stroke="#f87171"/>
+    <text x="732" y="481" font-size="12" font-weight="700" fill="#b91c1c">← POST /touch</text>
+    <text x="732" y="498" font-size="11" fill="#991b1b">+ /device 屏幕信息</text>
+    <rect x="720" y="522" width="160" height="60" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="732" y="541" font-size="11" fill="#475569">停止 → force-stop</text>
+    <text x="732" y="559" font-size="11" fill="#475569">接收器 + 撤回环</text>
+    <text x="732" y="575" font-size="11" fill="#475569">→ 手机恢复原界面</text>
+  </g>
+
+  <!-- 通道短连线 -->
+  <g stroke="#94a3b8" stroke-width="2">
+    <path d="M690 244 H720"/><path d="M690 304 H720"/><path d="M690 364 H720"/>
+    <path d="M690 424 H720"/><path d="M690 484 H720"/><path d="M690 550 H720"/>
+    <path d="M880 244 H910"/><path d="M880 304 H910"/><path d="M880 364 H910"/>
+    <path d="M880 424 H910"/><path d="M880 484 H910"/><path d="M880 550 H910"/>
+  </g>
+
+  <!-- ============ 手机区 ============ -->
+  <rect x="910" y="92" width="460" height="620" rx="16" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="2"/>
+  <text x="932" y="122" font-size="18" font-weight="700" fill="#065f46">Android 手机</text>
+  <text x="932" y="144" font-size="13" fill="#059669">USB（adb）/ 同一 WiFi 均可</text>
+
+  <rect x="932" y="160" width="416" height="122" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+  <text x="948" y="186" font-size="15" font-weight="700" fill="#1d4ed8">Moonlight（竖屏补丁版）</text>
+  <text x="948" y="210" font-size="12" fill="#334155">宽高交换 / 去 16 对齐 / stretchVideo</text>
+  <text x="948" y="232" font-size="12" fill="#334155">ShortcutTrampoline 直拉会话（不点 UI）</text>
+  <text x="948" y="254" font-size="12" fill="#334155">RTSP 解码 → 竖屏全屏铺满</text>
+
+  <rect x="932" y="300" width="416" height="238" rx="12" fill="#ffffff" stroke="#059669" stroke-width="2"/>
+  <text x="948" y="326" font-size="15" font-weight="700" fill="#047857">副屏接收器 APK（20KB，零操作）</text>
+  <rect x="948" y="340" width="384" height="34" rx="6" fill="#d1fae5"/>
+  <text x="960" y="362" font-size="12" fill="#065f46">ViewerService：NsdManager 发现 + 粘滞 pin</text>
+  <rect x="948" y="382" width="384" height="34" rx="6" fill="#d1fae5"/>
+  <text x="960" y="404" font-size="12" fill="#065f46">MainActivity：锁屏可显示 · 全屏 WebView</text>
+  <rect x="948" y="424" width="384" height="34" rx="6" fill="#d1fae5"/>
+  <text x="960" y="446" font-size="12" fill="#065f46">&lt;img src="/stream"&gt; MJPEG 原生解码</text>
+  <text x="948" y="484" font-size="11" fill="#64748b">粘滞规则：pin 活着无视新发现，死了才转投（防抢台）</text>
+  <text x="948" y="506" font-size="11" fill="#64748b">Chrome 74 兼容：禁 inset:，XHR 回传，object-fit</text>
+
+  <rect x="932" y="556" width="416" height="132" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="948" y="582" font-size="13" font-weight="700" fill="#334155">手机端交互</text>
+  <text x="948" y="606" font-size="12" fill="#475569">单指 = 左键　双指 = 右键　按住拖动 = 拖拽</text>
+  <text x="948" y="628" font-size="12" fill="#475569">触摸只作用于被投窗口，不动桌面 / 不抢前台</text>
+  <text x="948" y="650" font-size="12" fill="#475569">未装接收器 → Dock 经 adb 自动安装 APK</text>
+  <text x="948" y="672" font-size="12" fill="#475569">锁屏熄屏 → WAKEUP + dismiss-keyguard 后显示</text>
+
+  <!-- 图例 -->
+  <rect x="30" y="728" width="1340" height="36" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="46" y="751" font-size="12" fill="#475569">图例：蓝 = 扩展屏　绿 = 窗口投屏　灰 = 发现通道　红 = 触摸回传　｜　→ PC 发往手机　← 手机回传 PC　｜　详见 docs/TECHNICAL.md</text>
+</svg>

@@ -16,6 +16,17 @@ Windows 真实显示器  +  VDD 虚拟屏 (1080x2220 @60Hz, 位置 7280,0)
                     RTSP 47989  ──►  Moonlight (手机, 竖屏补丁, stretchVideo)
 ```
 
+此外还内置了一套**窗口投屏**（v1.2+）：把任意单个窗口（不是整块桌面）
+投到手机上——多路并发（窗口 A→手机 1，窗口 B→手机 2）、同一路流多台手机
+同时观看、手机上可直接触摸操作该窗口（点击/拖拽/右键）、PC 端全程零打扰。
+手机不装任何额外依赖，装一个 20KB 的接收器 APK 即可，USB/无线均可。
+
+```
+窗口 A ──► PrintWindow 抓帧 ──► MJPEG :8123 ──► 手机 1（USB 回环/WiFi）
+窗口 B ──► PrintWindow 抓帧 ──► MJPEG :8124 ──► 手机 2
+                ▲ mDNS 广播，手机自动发现
+```
+
 ---
 
 ## 托盘状态含义
@@ -100,6 +111,27 @@ VDD_SETTINGS = r'C:\VirtualDisplayDriver\vdd_settings.xml'
 
 ---
 
+## 窗口投屏（快速上手）
+
+不依赖 Sunshine / VDD，装好 Dock 和接收器就能用：
+
+1. **手机装接收器**：`build/ExtScreenViewer/ExtScreenViewer.apk`（20KB，打开一次即可；
+   投屏时手机插着 USB 且未安装的话，Dock 会**自动安装**）
+2. **托盘 → 窗口投屏 → 选择窗口并开始分享…**：一个对话框里同时选
+   「投哪个窗口」和「投到哪台手机」（多台时列出型号/系统/分辨率/尺寸）
+3. 手机自动亮屏出画面。**停止投屏后手机自动恢复原状**（接收器自动退出）
+
+三种快捷入口：托盘菜单 / 窗口标题栏的绿色「投」小按钮（跟随前台窗口）/
+标题栏右键菜单与 Alt+Space 的自定义菜单。
+
+多路：再点一次「选择窗口并开始分享…」即第二路；同一路流支持多台手机同时观看。
+触摸：单指=左键、双指=右键、按住拖动=拖拽（只作用于被投窗口，不影响桌面）。
+
+详细技术设计（含架构图、数据流图、时序图）见 [`docs/TECHNICAL.md`](docs/TECHNICAL.md)，
+开发史见 [`docs/HISTORY.md`](docs/HISTORY.md)。
+
+---
+
 ## 从源码构建
 
 ```bash
@@ -140,18 +172,27 @@ python tools/publish_release.py
 ```
 src/
   extscreen_core.py       服务状态、SCM API、日志探针、设备/显示器枚举、配置
-  extscreen_dock.py       托盘主程序（菜单、动作、状态轮询）
+  extscreen_dock.py       托盘主程序（菜单、动作、状态轮询、窗口投屏 UI/钩子）
+  extscreen_cast.py       窗口投屏后端（抓帧/MJPEG/多路会话/触摸回传/窗口适配）
+  extscreen_mdns.py       纯标准库 mDNS/DNS-SD 应答器（参数化，多服务共用）
+  extscreen_deskreen.py   Deskreen CE 兼容层（历史方案，默认不用）
   extscreen_display.py    显示器布局、Sunshine 配置、EDID 匹配
+  phone_names.json        手机「型号→商品名」对照表（1.1 万条，打包进 exe）
   settings_gui.py         设置界面
 tools/
+  deskreen-viewer/        Android「副屏接收器」源码（WebView+NsdManager 前台服务）
+  build_deskreen_viewer.py    接收器 APK 免 Gradle 构建（aapt2→javac→d8→apksigner）
+  test_cast_contract.py       窗口投屏契约测试（98 checks）
   test_state_truthfulness.py  状态真实性回归测试（40 checks）
   test_action_contract.py     动作返回值契约回归测试
+  test_multi_cast_e2e.py      多会话投屏端到端测试
+  test_sysmenu_hook.py        标题栏右键接管 e2e 测试
   svc_ctl.py / vdd_ctl.py     短命提权脚本（起停服务 / 操作虚拟屏）
   patch_moonlight.py          Moonlight 竖屏补丁
   e2e_cycle.py                开→串流→关 端到端循环测试
   publish_release.py          GitHub Release 发布脚本（REST API，无需 gh CLI）
 vendor/moonlight-desktop-extender/   运行时依赖的虚拟屏控制脚本（已含本项目补丁）
-docs/                            补丁说明、构建脚本、验证截图
+docs/                            技术文档（TECHNICAL.md / HISTORY.md / 补丁说明）
 ```
 
 ---
@@ -204,6 +245,8 @@ Sunshine 的 DXGI 抓屏句柄会让 `Disable-PnpDevice` 永久阻塞在排空�
 ```bash
 python tools/test_state_truthfulness.py    # 40 checks —— 就绪探针、日志滚动、状态文案、开关方向
 python tools/test_action_contract.py       # do_async 返回值契约
+python tools/test_cast_contract.py         # 98 checks —— 窗口投屏全链路契约（mDNS 字节级/触摸/多会话/选择器…）
+python tools/test_multi_cast_e2e.py        # 多会话真投端到端（双记事本、双端口、独立停止）
 ```
 
 `do_async` 约定动作函数返回 `(ok, msg)` 二元组。历史上 `restart_vdd()` 漏返回
@@ -213,7 +256,10 @@ msg 导致托盘崩溃（`cannot unpack non-iterable bool object`），契约测
 
 ## 已知限制
 
-- 左右各 9px 黑边未消除（流 2220 vs 窗口 2180）
+- 扩展屏：左右各 9px 黑边未消除（流 2220 vs 窗口 2180）
+- 窗口投屏：MJPEG 延迟约 0.1 秒，适合文档/终端/监控，不适合高速游戏；
+  .NET WinForms 窗口不读鼠标拖动标志，只支持点击不支持拖拽
+- 同一台手机同时只显示一路投屏（接收器是单画面 WebView）
 - `sunshine.log` 系列旧日志里残留大量未启用虚拟适配器，IDD 资源可能被占满，
   建议定期清理
 - 托盘需要**管理员权限**（启停服务、操作虚拟显示器设备节点）
